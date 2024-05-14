@@ -12,6 +12,7 @@
 + 安全，轻量，最小依赖
 + 支持密码和ssh key两种认证方式，自动识别ssh key
 + 服务行为可配置
++ 支持下标和名称两种方式登录服务器
 
 # 安装
 ## 二进制
@@ -32,8 +33,8 @@ $ mkdir -p ~/.easyssh
 $ vim ~/.easyssh/config.yaml
 ###
 server:
-  - name: "产品库_uat"
-    host: "10.100.50.99"
+  - name: "server1"
+    host: "10.100.10.10"
     port: 22 # 可省略，默认22
     user: "" # 可省略，默认当前用户
     password: "" # 可省略，默认使用ssh key
