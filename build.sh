@@ -1,5 +1,7 @@
 #!/bin/bash
 
+go mod tidy
+
 go build easyssh.go
 
 # 执行命令并将输出保存到变量中
