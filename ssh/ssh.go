@@ -120,7 +120,7 @@ func (c *Cli) RunTerminal(stdout, stderr io.Writer) error {
 			return err
 		}
 	}
-	ticker := time.NewTicker(5 * time.Second) // 每分钟发送一次探活消息
+	ticker := time.NewTicker(3 * time.Second) // 每3分钟发送一次探活消息
 	defer ticker.Stop()
 	session, err := c.client.NewSession()
 	if err != nil {
