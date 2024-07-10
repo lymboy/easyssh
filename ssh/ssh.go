@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -162,6 +163,17 @@ func (c *Cli) RunTerminal(stdout, stderr io.Writer) error {
 	if err := session.RequestPty("xterm-256color", termHeight, termWidth, modes); err != nil {
 		return err
 	}
+
+	// 处理终端大小变化
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGWINCH)
+	go func() {
+		for range signals {
+			if termWidth, termHeight, err = terminal.GetSize(fd); err == nil {
+				_ = session.WindowChange(termHeight, termWidth)
+			}
+		}
+	}()
 
 	// 开启探活
 	if config.GetConf().GetSSHConfig().KeepAlive {

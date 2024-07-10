@@ -7,6 +7,7 @@ import (
 )
 
 type Server struct {
+	Group    string `json:"group" yaml:"group"`
 	Name     string `json:"name" yaml:"name"`
 	Host     string `json:"host" yaml:"host"`
 	Port     int    `json:"port" yaml:"port"`
@@ -14,6 +15,13 @@ type Server struct {
 	Password string `json:"password" yaml:"password"`
 	Parent   string `json:"parent" yaml:"parent"`
 	Desc     string `json:"desc" yaml:"desc"`
+}
+
+func (s Server) GetGroup() string {
+	if len(s.Group) == 0 {
+		return "Default"
+	}
+	return s.Group
 }
 
 func (s Server) GetName() string {

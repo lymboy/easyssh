@@ -11,8 +11,8 @@ import (
 
 var ServerCmd = &cobra.Command{
 	Use:   "server",
-	Short: "Server commands",
-	Long:  `Server commands`,
+	Short: "ServerList commands",
+	Long:  `ServerList commands`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			gotoSSH(args[0])
