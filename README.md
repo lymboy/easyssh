@@ -29,7 +29,8 @@ $ mkdir -p ~/.easyssh
 $ vim ~/.easyssh/config.yaml
 ###
 server:
-  - name: "server1"
+  - group: "prod"
+    name: "server1"
     host: "10.100.10.10"
     port: 22 # 可省略，默认22
     user: "foo" # 可省略，默认当前用户
@@ -38,4 +39,4 @@ server:
 ```
 
 # 示例
-![img.png](img.png)
+![](./img.png)
