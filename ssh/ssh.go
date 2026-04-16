@@ -8,7 +8,6 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/term"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -43,27 +42,22 @@ func getPublicKeyPath() string {
 	return pubKeyPath
 }
 
-func getPrivateKeySign() ssh.Signer {
+func getPrivateKeySign() (ssh.Signer, error) {
 	// 读取私钥文件
 	privateBytes, err := os.ReadFile(getPublicKeyPath())
 	if err != nil {
-		log.Fatalf("Failed to load private key (%s)", err)
+		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
 	// 解析私钥
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		log.Fatalf("Failed to parse private key (%s)", err)
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
-	return private
+	return private, nil
 }
 
 func getPassword() string {
-	//var password string
-	//fmt.Print("Enter password: ")
-	//_, _ = fmt.Scanln(&password)
-	//return password
-
 	fmt.Print("Enter password: ")
 	// 获取当前的终端
 	oldTerm, _ := term.GetState(syscall.Stdin)
@@ -83,34 +77,46 @@ func getPassword() string {
 
 func (c *Cli) connect() error {
 	authList := make([]ssh.AuthMethod, 0)
-	sign := getPrivateKeySign()
-	if sign != nil {
+
+	sign, err := getPrivateKeySign()
+	if err == nil && sign != nil {
 		authList = append(authList, ssh.PublicKeys(sign))
 	}
-	authList = append(authList, ssh.Password(c.Password))
+
+	if c.Password != "" {
+		authList = append(authList, ssh.Password(c.Password))
+	}
 
 	clientConfig := ssh.ClientConfig{
 		User:            c.Username,
 		Auth:            authList,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // 忽略服务器的 HostKey 验证
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
 	}
+
 	addr := fmt.Sprintf("%s:%d", c.IP, c.Port)
 	var sshClient *ssh.Client
-	var err error
 	const retry = 3
+
 	for i := 0; i < retry; i++ {
 		sshClient, err = ssh.Dial("tcp", addr, &clientConfig)
-		if err != nil {
-			authList = authList[:len(authList)-1]
-			authList = append(authList, ssh.Password(getPassword()))
+		if err == nil {
+			break
+		}
+		// Try password prompt on failure
+		if i < retry-1 {
+			fmt.Printf("\n\033[33mAuthentication failed for %s@%s\033[0m\n", c.Username, c.IP)
+			fmt.Printf("Enter password: ")
+			password := getPassword()
+			authList = []ssh.AuthMethod{ssh.Password(password)}
 			clientConfig.Auth = authList
 		}
 	}
+
 	if err != nil {
-		log.Printf("Failed to dial (attempt %d times): %s", retry, err)
-		return err
+		return fmt.Errorf("failed to connect to %s@%s:%d after %d attempts: %w", c.Username, c.IP, c.Port, retry, err)
 	}
+
 	c.client = sshClient
 	return nil
 }
@@ -121,29 +127,21 @@ func (c *Cli) RunTerminal(stdout, stderr io.Writer) error {
 			return err
 		}
 	}
-	ticker := time.NewTicker(3 * time.Second) // 每3分钟发送一次探活消息
-	defer ticker.Stop()
 	session, err := c.client.NewSession()
 	if err != nil {
 		return err
 	}
 	defer func(session *ssh.Session) {
-		err := session.Close()
-		if err != nil {
-
-		}
+		_ = session.Close()
 	}(session)
 
 	fd := int(os.Stdin.Fd())
 	oldState, err := terminal.MakeRaw(fd)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to set terminal to raw mode: %w", err)
 	}
 	defer func(fd int, oldState *terminal.State) {
-		err := terminal.Restore(fd, oldState)
-		if err != nil {
-
-		}
+		_ = terminal.Restore(fd, oldState)
 	}(fd, oldState)
 
 	session.Stdout = stdout
@@ -152,7 +150,7 @@ func (c *Cli) RunTerminal(stdout, stderr io.Writer) error {
 
 	termWidth, termHeight, err := terminal.GetSize(fd)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to get terminal size: %w", err)
 	}
 
 	modes := ssh.TerminalModes{
@@ -175,19 +173,17 @@ func (c *Cli) RunTerminal(stdout, stderr io.Writer) error {
 		}
 	}()
 
-	// 开启探活
+	// Keep-alive logic
 	if config.GetConf().GetSSHConfig().KeepAlive {
-		// 设置 keepalive 参数
-		ticker := time.NewTicker(5 * time.Second) // 每分钟发送一次探活消息
-		defer ticker.Stop()
-		// 发送探活消息
+		keepAliveInterval := config.GetConf().GetSSHConfig().GetKeepAliveInterval()
+		keepAliveTicker := time.NewTicker(keepAliveInterval)
+		defer keepAliveTicker.Stop()
+
 		go func() {
-			for range ticker.C {
-				// 向服务器发送一个全局请求，比如 keepalive@openssh.com
+			for range keepAliveTicker.C {
 				_, err := session.SendRequest("keepalive@openssh.com", true, nil)
 				if err != nil {
-					log.Printf("error sending keep-alive message: %s", err)
-					// 发生错误时，可以选择重新建立连接或者执行其他处理逻辑
+					// Connection likely dead, will be handled by session.Wait()
 				}
 			}
 		}()
