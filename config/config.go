@@ -3,7 +3,6 @@ package config
 import (
 	"easyssh/util"
 	"fmt"
-	"github.com/olekukonko/tablewriter"
 	"os"
 	"os/user"
 	"sort"
@@ -137,38 +136,105 @@ func (c Config) PrintServer() {
 }
 
 func (c Config) PrintServerV2() {
-	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ServerList  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+	// Print header
 	fmt.Println()
-	// 创建表格
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"ID", "Group", "Name", "Host", "Port", "User", "Password", "Parent", "Desc"})
-	table.SetHeaderColor(
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiGreenColor},
-	)
-	table.SetCaption(true, "Welcome visit: https://lymboy.com")
-	table.SetAutoMergeCells(true)
-	table.SetAutoMergeCellsByColumnIndex([]int{1})
-	//table.SetRowLine(true)
-	// 添加数据到表格
+	printColoredLine("═", 80, "cyan")
+	fmt.Println()
+
+	// Print table header
+	headerFmt := "%-5s %-18s %-12s %-18s %-12s %s"
+	fmt.Printf(headerFmt, "ID", "NAME", "GROUP", "HOST", "USER", "STATUS")
+	fmt.Println()
+	printColoredLine("─", 80, "dim")
+	fmt.Println()
+
+	// Track groups for separators and stats
+	var lastGroup string
+	groupCounts := make(map[string]int)
+
+	// Print rows
 	for index, svr := range c.GetServerList() {
-		// 如果是 root 用户，加红显示
-		if strings.EqualFold(svr.GetUser(), "root") {
-			cols := []string{cast.ToString(index), svr.GetGroup(), svr.GetName(), svr.GetHost(), fmt.Sprintf("%d", svr.GetPort()), svr.GetUser(), svr.GetPassword(), svr.GetParent(), svr.GetDesc()}
-			table.Rich(cols, []tablewriter.Colors{tablewriter.Colors{}, tablewriter.Colors{}, tablewriter.Colors{}, tablewriter.Colors{}, tablewriter.Colors{}, tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiRedColor}, tablewriter.Colors{}, tablewriter.Colors{}, tablewriter.Colors{}})
-			continue
+		group := svr.GetGroup()
+		groupCounts[group]++
+
+		// Add group separator when group changes
+		if lastGroup != "" && lastGroup != group {
+			printColoredLine("─", 80, "dim")
+			fmt.Println()
 		}
-		table.Append([]string{cast.ToString(index), svr.GetGroup(), svr.GetName(), svr.GetHost(), fmt.Sprintf("%d", svr.GetPort()), svr.GetUser(), svr.GetPassword(), svr.GetParent(), svr.GetDesc()})
+		lastGroup = group
+
+		// Format user with color (red for root)
+		userDisplay := svr.GetUser()
+		if strings.EqualFold(userDisplay, "root") {
+			userDisplay = colorRed(userDisplay)
+		}
+
+		// Format status
+		statusDisplay := colorDim("○ Idle")
+
+		// Print row
+		fmt.Printf("%-5s %-18s %-12s %-18s %-12s %s",
+			colorCyan(fmt.Sprintf("[%d]", index)),
+			colorYellow(svr.GetName()),
+			colorBlue(group),
+			svr.GetHost(),
+			userDisplay,
+			statusDisplay,
+		)
+		fmt.Println()
 	}
-	// 渲染表格
-	table.Render()
+
+	// Bottom separator
+	printColoredLine("─", 80, "dim")
+	fmt.Println()
+
+	// Print stats
+	var stats []string
+	stats = append(stats, fmt.Sprintf("Total: %d servers", len(c.GetServerList())))
+	for group, count := range groupCounts {
+		stats = append(stats, fmt.Sprintf("%s: %d", group, count))
+	}
+	fmt.Println(colorDim(strings.Join(stats, " | ")))
+
+	fmt.Println()
+}
+
+// Helper functions for colors
+func colorRed(s string) string {
+	return fmt.Sprintf("\033[1;31m%s\033[0m", s)
+}
+
+func colorYellow(s string) string {
+	return fmt.Sprintf("\033[33m%s\033[0m", s)
+}
+
+func colorBlue(s string) string {
+	return fmt.Sprintf("\033[34m%s\033[0m", s)
+}
+
+func colorCyan(s string) string {
+	return fmt.Sprintf("\033[36m%s\033[0m", s)
+}
+
+func colorDim(s string) string {
+	return fmt.Sprintf("\033[2m%s\033[0m", s)
+}
+
+func colorGreen(s string) string {
+	return fmt.Sprintf("\033[32m%s\033[0m", s)
+}
+
+func printColoredLine(char string, width int, colorType string) {
+	line := strings.Repeat(char, width)
+	switch colorType {
+	case "cyan":
+		fmt.Print(colorCyan(line))
+	case "dim":
+		fmt.Print(colorDim(line))
+	default:
+		fmt.Print(line)
+	}
 }
 
 func (c Config) Print() {
