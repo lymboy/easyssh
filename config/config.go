@@ -4,8 +4,10 @@ import (
 	"easyssh/util"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -136,16 +138,41 @@ func (c Config) PrintServer() {
 }
 
 func (c Config) PrintServerV2() {
-	// Print header
+	servers := c.GetServerList()
+
+	// Calculate dynamic column widths using display width
+	// NAME: increase minWidth for Chinese service names (e.g., "企业账号中心" = 12 display width)
+	maxName := 15  // Minimum width for NAME column
+	maxGroup := 8  // Minimum width for GROUP column
+	maxHost := 12  // Minimum width for HOST column
+	maxUser := 6   // Minimum width for USER column
+
+	const maxNameWidth = 30
+	const maxGroupWidth = 15
+	const maxHostWidth = 35
+	const maxUserWidth = 15
+
+	for _, svr := range servers {
+		maxName = maxInt(maxName, minInt(getDisplayWidth(svr.GetName()), maxNameWidth))
+		maxGroup = maxInt(maxGroup, minInt(getDisplayWidth(svr.GetGroup()), maxGroupWidth))
+		maxHost = maxInt(maxHost, minInt(getDisplayWidth(svr.GetHost()), maxHostWidth))
+		maxUser = maxInt(maxUser, minInt(getDisplayWidth(svr.GetUser()), maxUserWidth))
+	}
+
+	// Calculate total width and print header
+	totalWidth := 5 + maxName + maxGroup + maxHost + maxUser + 12 // ID + NAME + GROUP + HOST + USER + STATUS + spaces
 	fmt.Println()
-	printColoredLine("═", 80, "cyan")
+	printColoredLine("═", totalWidth, "cyan")
 	fmt.Println()
 
 	// Print table header
-	headerFmt := "%-5s %-18s %-12s %-18s %-12s %s"
-	fmt.Printf(headerFmt, "ID", "NAME", "GROUP", "HOST", "USER", "STATUS")
-	fmt.Println()
-	printColoredLine("─", 80, "dim")
+	printPadded("ID", 5, "")
+	printPadded("NAME", maxName, "")
+	printPadded("GROUP", maxGroup, "")
+	printPadded("HOST", maxHost, "")
+	printPadded("USER", maxUser, "")
+	fmt.Println("STATUS")
+	printColoredLine("─", totalWidth, "dim")
 	fmt.Println()
 
 	// Track groups for separators and stats
@@ -153,51 +180,132 @@ func (c Config) PrintServerV2() {
 	groupCounts := make(map[string]int)
 
 	// Print rows
-	for index, svr := range c.GetServerList() {
+	for index, svr := range servers {
 		group := svr.GetGroup()
 		groupCounts[group]++
 
 		// Add group separator when group changes
 		if lastGroup != "" && lastGroup != group {
-			printColoredLine("─", 80, "dim")
+			printColoredLine("─", totalWidth, "dim")
 			fmt.Println()
 		}
 		lastGroup = group
 
-		// Format user with color (red for root)
+		// Print ID with cyan color
+		printColoredPadded(fmt.Sprintf("[%d]", index), 5, colorCyan)
+
+		// Print NAME with yellow color (truncate to maxNameWidth)
+		printColoredPadded(truncate(svr.GetName(), maxNameWidth), maxName, colorYellow)
+
+		// Print GROUP with blue color (truncate to maxGroupWidth)
+		printColoredPadded(truncate(svr.GetGroup(), maxGroupWidth), maxGroup, colorBlue)
+
+		// Print HOST (truncate to maxHostWidth)
+		printPadded(truncate(svr.GetHost(), maxHostWidth), maxHost, "")
+
+		// Print USER (red for root, truncate to maxUserWidth)
 		userDisplay := svr.GetUser()
 		if strings.EqualFold(userDisplay, "root") {
-			userDisplay = colorRed(userDisplay)
+			printColoredPadded(truncate(userDisplay, maxUserWidth), maxUser, colorRed)
+		} else {
+			printPadded(truncate(userDisplay, maxUserWidth), maxUser, "")
 		}
 
-		// Format status
-		statusDisplay := colorDim("○ Idle")
-
-		// Print row
-		fmt.Printf("%-5s %-18s %-12s %-18s %-12s %s",
-			colorCyan(fmt.Sprintf("[%d]", index)),
-			colorYellow(svr.GetName()),
-			colorBlue(group),
-			svr.GetHost(),
-			userDisplay,
-			statusDisplay,
-		)
-		fmt.Println()
+		// Print STATUS - check actual connection via ControlMaster if enabled
+		if GetConf().GetSSHConfig().ShouldUseSystemSSH() {
+			fmt.Println(GetConnectionStatus(svr.GetHost(), svr.GetPort(), svr.GetUser()))
+		} else {
+			fmt.Println(colorDim("○ Idle"))
+		}
 	}
 
 	// Bottom separator
-	printColoredLine("─", 80, "dim")
+	printColoredLine("─", totalWidth, "dim")
 	fmt.Println()
 
 	// Print stats
 	var stats []string
-	stats = append(stats, fmt.Sprintf("Total: %d servers", len(c.GetServerList())))
+	stats = append(stats, fmt.Sprintf("Total: %d servers", len(servers)))
 	for group, count := range groupCounts {
 		stats = append(stats, fmt.Sprintf("%s: %d", group, count))
 	}
 	fmt.Println(colorDim(strings.Join(stats, " | ")))
 
 	fmt.Println()
+}
+
+// getDisplayWidth returns the display width of a string
+// Chinese characters take 2 display widths, ASCII take 1
+func getDisplayWidth(s string) int {
+	width := 0
+	for _, r := range s {
+		if r < 128 {
+			width += 1
+		} else {
+			width += 2 // Chinese and other wide characters
+		}
+	}
+	return width
+}
+
+// truncate truncates a string if it exceeds maxLen (by display width)
+func truncate(s string, maxLen int) string {
+	if getDisplayWidth(s) <= maxLen {
+		return s
+	}
+
+	// Truncate by display width
+	result := ""
+	currentWidth := 0
+	for _, r := range s {
+		charWidth := 1
+		if r >= 128 {
+			charWidth = 2
+		}
+		if currentWidth+charWidth > maxLen-3 {
+			break
+		}
+		result += string(r)
+		currentWidth += charWidth
+	}
+	return result + "..."
+}
+
+// printPadded prints a string with padding (no color)
+func printPadded(s string, width int, _ string) {
+	displayWidth := getDisplayWidth(s)
+	padding := width - displayWidth
+	if padding < 0 {
+		padding = 0
+	}
+	fmt.Printf("%s%s ", s, strings.Repeat(" ", padding))
+}
+
+// printColoredPadded prints a colored string with proper padding
+func printColoredPadded(s string, width int, colorFunc func(string) string) {
+	colored := colorFunc(s)
+	displayWidth := getDisplayWidth(s)
+	padding := width - displayWidth
+	if padding < 0 {
+		padding = 0
+	}
+	fmt.Printf("%s%s ", colored, strings.Repeat(" ", padding))
+}
+
+// maxInt returns the maximum of two integers
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// minInt returns the minimum of two integers
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Helper functions for colors
@@ -281,4 +389,28 @@ func getConfigDir() string {
 		_ = util.Mkdir(dir)
 	}
 	return dir
+}
+
+// CheckSSHConnection checks if there's an active SSH connection via ControlMaster
+// Returns true if connected, false otherwise
+func CheckSSHConnection(host string, port int, user string) bool {
+	// Use ssh -O check to see if there's an active connection
+	// Address format: user@host (port via -p flag)
+	args := []string{"-O", "check"}
+	if port != 22 {
+		args = append(args, "-p", strconv.Itoa(port))
+	}
+	args = append(args, fmt.Sprintf("%s@%s", user, host))
+
+	cmd := exec.Command("ssh", args...)
+	err := cmd.Run()
+	return err == nil
+}
+
+// GetConnectionStatus returns a status string for display
+func GetConnectionStatus(host string, port int, user string) string {
+	if CheckSSHConnection(host, port, user) {
+		return colorGreen("● Connected")
+	}
+	return colorDim("○ Idle")
 }

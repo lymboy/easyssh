@@ -14,6 +14,8 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/lymboy/easyssh.svg)](https://github.com/lymboy/easyssh/releases)
 
+**[中文文档](README_zh.md)**
+
 </div>
 
 ---
@@ -85,27 +87,14 @@ go build -o easyssh .
 ### Configure
 
 ```bash
+# Create config directory
 mkdir -p ~/.easyssh
-cat > ~/.easyssh/easy_config.yaml << 'EOF'
-ssh:
-  key: "id_rsa"
-  keep_alive: true
-  keep_alive_interval: "60s"
 
-server:
-  - group: "prod"
-    name: "web-master"
-    host: "192.168.1.10"
-    user: "root"
-  - group: "prod"
-    name: "web-slave"
-    host: "192.168.1.11"
-    user: "root"
-  - group: "dev"
-    name: "dev-server"
-    host: "10.0.0.5"
-    user: "dev"
-EOF
+# Copy example config
+cp easy_config.yaml.example ~/.easyssh/easy_config.yaml
+
+# Edit configuration
+vim ~/.easyssh/easy_config.yaml
 ```
 
 ### Use
@@ -114,7 +103,68 @@ EOF
 easyssh server ls     # List all servers
 easyssh server 0      # Connect by index
 easyssh server web-master  # Connect by name
+easyssh add           # Interactively add servers
 ```
+
+### Add Servers
+
+Add new servers interactively or via command line:
+
+```bash
+# Interactive mode
+easyssh add
+
+# Command line mode (batch add)
+easyssh add -g prod -e web -u root -i "192.168.1.10 192.168.1.11"
+
+# Or with comma-separated IPs
+easyssh add --group prod --env web --user root --ips "192.168.1.10,192.168.1.11,192.168.1.12"
+
+# Remove a server
+easyssh remove 0        # By index
+easyssh remove web-1    # By name
+```
+
+## 🔗 Connection Reuse (SSH ControlMaster)
+
+Enable SSH ControlMaster to share connections across terminals - reconnect without entering password again.
+
+### Quick Setup (Recommended)
+
+```bash
+$ easyssh setup
+
+  EasySSH Setup - SSH ControlMaster Configuration
+
+  Will add the following to ~/.ssh/config:
+
+    # EasySSH Connection Reuse
+    Host *
+        ControlMaster auto
+        ControlPath ~/.ssh/sockets/%r@%h-%p
+        ControlPersist no
+        ServerAliveInterval 60
+
+  ✓ SSH ControlMaster configured successfully!
+```
+
+### Manual Setup
+
+Or manually add to `~/.ssh/config`:
+
+```bash
+Host *
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist no
+    ServerAliveInterval 60
+
+mkdir -p ~/.ssh/sockets
+```
+
+### Enable in EasySSH
+
+Now open Terminal 1 and connect to a server, then open Terminal 2 - the connection will be instantly reused without re-entering password!
 
 ---
 
@@ -126,6 +176,8 @@ easyssh server web-master  # Connect by name
 | 🔐 **Dual Auth** | Automatic detection of SSH Key or password |
 | 📋 **Flexible Connection** | Connect by index number or server name |
 | 🎨 **Group Management** | Organize servers by environment |
+| ➕ **Easy Add** | Interactively add servers with batch IP support |
+| 🔗 **Connection Reuse** | Share SSH connections across terminals (via ControlMaster) |
 | ⚡ **Lightweight** | Single binary, no dependencies |
 | 🖥️ **Terminal Native** | Works in any terminal, no GUI needed |
 

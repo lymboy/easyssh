@@ -9,8 +9,10 @@ import (
 	"golang.org/x/term"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -122,6 +124,36 @@ func (c *Cli) connect() error {
 }
 
 func (c *Cli) RunTerminal(stdout, stderr io.Writer) error {
+	// Check if we should use system SSH (supports ControlMaster for connection reuse)
+	if config.GetConf().GetSSHConfig().ShouldUseSystemSSH() {
+		return c.runSystemSSH()
+	}
+	return c.runNativeSSH(stdout, stderr)
+}
+
+// runSystemSSH delegates to the system ssh command
+// This allows using SSH ControlMaster for connection reuse across terminals
+func (c *Cli) runSystemSSH() error {
+	args := []string{
+		"-p", strconv.Itoa(c.Port),
+		fmt.Sprintf("%s@%s", c.Username, c.IP),
+	}
+
+	cmd := exec.Command("ssh", args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// Forward terminal signals
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Foreground: true,
+	}
+
+	return cmd.Run()
+}
+
+// runNativeSSH uses the native Go SSH implementation
+func (c *Cli) runNativeSSH(stdout, stderr io.Writer) error {
 	if c.client == nil {
 		if err := c.connect(); err != nil {
 			return err

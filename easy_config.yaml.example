@@ -1,0 +1,70 @@
+# EasySSH 配置文件示例
+# 复制此文件到 ~/.easyssh/easy_config.yaml 使用
+# cp easy_config.yaml.example ~/.easyssh/easy_config.yaml
+
+ssh:
+  # SSH 私钥文件名（位于 ~/.ssh/ 目录下）
+  # 默认值: id_rsa
+  key: "id_rsa"
+
+  # 是否启用 SSH 连接保活
+  # 建议开启，防止长时间不操作导致连接断开
+  # 默认值: true
+  keep_alive: true
+
+  # 保活心跳间隔
+  # 默认值: 60s
+  keep_alive_interval: "60s"
+
+  # 是否使用系统 SSH 命令
+  # 开启后支持 SSH ControlMaster 连接复用
+  # 配置方法：运行 easyssh setup 自动配置
+  # 默认值: false
+  use_system_ssh: true
+
+# 服务器列表
+# 支持按 group 分组管理
+server:
+  # ==================== 生产环境 ====================
+  - group: "prod"
+    name: "web-master"           # 服务器名称（必填）
+    host: "192.168.1.10"        # 服务器地址（必填）
+    port: 22                     # SSH 端口（默认: 22）
+    user: "root"                 # SSH 用户（默认: 当前用户）
+    # password: ""               # 密码（可选，建议使用密钥认证）
+    desc: "Production web server"  # 描述（可选）
+
+  - group: "prod"
+    name: "web-slave"
+    host: "192.168.1.11"
+    user: "root"
+
+  - group: "prod"
+    name: "db-primary"
+    host: "192.168.1.20"
+    port: 22
+    user: "admin"
+
+  # ==================== 测试环境 ====================
+  - group: "uat"
+    name: "uat-web"
+    host: "10.0.0.10"
+    user: "deploy"
+
+  - group: "uat"
+    name: "uat-db"
+    host: "10.0.0.11"
+    user: "deploy"
+
+  # ==================== 开发环境 ====================
+  - group: "dev"
+    name: "dev-server"
+    host: "10.0.1.5"
+    user: "dev"
+
+  # ==================== 默认分组 ====================
+  - group: "default"
+    name: "bastion"
+    host: "jump.company.com"
+    user: "sairo"
+    desc: "Jump server"
