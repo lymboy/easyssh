@@ -99,6 +99,28 @@ func (c Config) GetServerForMap() map[string]*Server {
 	return serverMap
 }
 
+// GetAllServerNames returns all server names for similarity matching
+func (c Config) GetAllServerNames() []string {
+	names := make([]string, 0, len(c.GetServerList()))
+	for _, server := range c.GetServerList() {
+		names = append(names, server.GetName())
+	}
+	return names
+}
+
+// GetSimilarServerNames returns server names similar to the given name
+func (c Config) GetSimilarServerNames(name string, maxDistance int, limit int) []string {
+	if limit <= 0 {
+		return nil
+	}
+	allNames := c.GetAllServerNames()
+	similar := util.SimilarNames(name, allNames, maxDistance)
+	if len(similar) > limit {
+		similar = similar[:limit]
+	}
+	return similar
+}
+
 func (c Config) ContainsServer(str string) bool {
 	if util.IsDigit(str) {
 		return nil == c.GetServerByIndex(cast.ToInt(str))
