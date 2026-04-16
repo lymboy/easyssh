@@ -64,6 +64,24 @@ chmod +x /usr/local/bin/easyssh
 go install github.com/lymboy/easyssh@latest
 ```
 
+**Build from source (cross-platform):**
+```bash
+git clone https://github.com/lymboy/easyssh.git
+cd easyssh
+
+# macOS
+GOOS=darwin GOARCH=amd64 go build -o easyssh_darwin_amd64 .
+
+# Linux
+GOOS=linux GOARCH=amd64 go build -o easyssh_linux_amd64 .
+
+# Windows
+GOOS=windows GOARCH=amd64 go build -o easyssh_windows_amd64.exe .
+
+# Or build for your current platform
+go build -o easyssh .
+```
+
 ### Configure
 
 ```bash
