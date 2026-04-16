@@ -12,11 +12,12 @@ var (
 	userLicense string
 
 	rootCmd = &cobra.Command{
-		Use:   "cobra-cli",
-		Short: "A generator for Cobra based Applications",
-		Long: `Cobra is a CLI library for Go that empowers applications.
-		This application is a tool to generate the needed files
-		to quickly create a Cobra application.`,
+		Use:   "easyssh",
+		Short: "SSH server management tool for terminal users",
+		Long: `EasySSH is a lightweight SSH server management tool.
+
+It helps you manage multiple servers without GUI tools like XShell or tabby.
+Just configure your servers and connect with a single command.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			server.ServerCmd.Run(cmd, args)
 		},
@@ -29,6 +30,7 @@ func Execute() error {
 }
 
 func init() {
+	rootCmd.SilenceErrors = true
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(server.ServerCmd)
 	rootCmd.AddCommand(version.VersionCmd)
