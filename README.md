@@ -1,42 +1,175 @@
-# easyssh
-![](https://img.shields.io/badge/go-1.22-brightgreen.svg)
+<div align="center">
 
-一个命令行工具，对于终端用户来说可以避免安装XShell，tabby等图形化工具
+<pre>
+   ___ _             _____ _       _ _
+  / __| |_  ___ _  _|_   _| |_  __| | | _
+ | (__| ' \/ -_) || | | | | ' \/ _` | || |
+  \___|_||_\___|\_, |_| |_|_||_\__,_|_||_|
+                |_|
+</pre>
 
-## Feature
+**SSH server management for terminal users**
 
-+ 自动重连，避免ssh链接长时间不活动被断开
-+ 简单，轻量，最小依赖
-+ 支持密码和ssh key两种认证方式，自动识别ssh key
-+ 支持下标和名称两种方式登录服务器
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/lymboy/easyssh.svg)](https://github.com/lymboy/easyssh/releases)
 
-# 安装
-## 二进制
-```shell
-wget https://github.com/lymboy/easyssh/releases/download/v1.0.0/easyssh_darwin_amd64_v1.0.0 -O /usr/local/bin/easyssh
+</div>
+
+---
+
+## 📺 Preview
+
+> **A picture is worth a thousand words**
+
+```bash
+$ easyssh server ls
+
+════════════════════════════════════════════════════════════════════════════════
+
+ID    NAME               GROUP        HOST               USER         STATUS
+──────────────────────────────────────────────────────────────────────────────
+[0]   web-master         prod         192.168.1.10      root         ○ Idle
+[1]   web-slave          prod         192.168.1.11      root         ○ Idle
+[2]   db-primary         prod         192.168.1.20     admin         ○ Idle
+──────────────────────────────────────────────────────────────────────────────
+[3]   dev-server         dev          10.0.0.5          dev          ○ Idle
+[4]   test-server        dev          10.0.0.6          dev          ○ Idle
+──────────────────────────────────────────────────────────────────────────────
+Total: 5 servers | prod: 3 | dev: 2
+
+$ easyssh server 0
+# Connected to root@192.168.1.10
 ```
 
-## 源码编译
-```shell
-$ git clone --depth=1 https://github.com/lymboy/easyssh.git
-$ cd easyssh
-$ ./build.sh
+---
+
+## ⚡ Quick Start
+
+### Install
+
+**From binary (recommended):**
+```bash
+# macOS
+wget https://github.com/lymboy/easyssh/releases/latest/download/easyssh_darwin_amd64 -O /usr/local/bin/easyssh
+chmod +x /usr/local/bin/easyssh
+
+# Linux
+wget https://github.com/lymboy/easyssh/releases/latest/download/easyssh_linux_amd64 -O /usr/local/bin/easyssh
+chmod +x /usr/local/bin/easyssh
 ```
 
-# 配置
-```shell
-$ mkdir -p ~/.easyssh
-$ vim ~/.easyssh/config.yaml
-###
+**From source:**
+```bash
+go install github.com/lymboy/easyssh@latest
+```
+
+### Configure
+
+```bash
+mkdir -p ~/.easyssh
+cat > ~/.easyssh/easy_config.yaml << 'EOF'
+ssh:
+  key: "id_rsa"
+  keep_alive: true
+  keep_alive_interval: "60s"
+
 server:
   - group: "prod"
-    name: "server1"
-    host: "10.100.10.10"
-    port: 22 # 可省略，默认22
-    user: "foo" # 可省略，默认当前用户
-    password: "123456" # 可省略，优先使用ssh key
-###
+    name: "web-master"
+    host: "192.168.1.10"
+    user: "root"
+  - group: "prod"
+    name: "web-slave"
+    host: "192.168.1.11"
+    user: "root"
+  - group: "dev"
+    name: "dev-server"
+    host: "10.0.0.5"
+    user: "dev"
+EOF
 ```
 
-# 示例
-![](./img.png)
+### Use
+
+```bash
+easyssh server ls     # List all servers
+easyssh server 0      # Connect by index
+easyssh server web-master  # Connect by name
+```
+
+---
+
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔄 **Auto Keep-Alive** | Maintains connection during long idle periods |
+| 🔐 **Dual Auth** | Automatic detection of SSH Key or password |
+| 📋 **Flexible Connection** | Connect by index number or server name |
+| 🎨 **Group Management** | Organize servers by environment |
+| ⚡ **Lightweight** | Single binary, no dependencies |
+| 🖥️ **Terminal Native** | Works in any terminal, no GUI needed |
+
+---
+
+## 🆚 Why EasySSH?
+
+| | **EasySSH** | **XShell** | **tabby** |
+|-|:-----------:|:----------:|:---------:|
+| **Size** | ~5MB | ~50MB | ~100MB |
+| **Dependencies** | None | GUI libs | Electron |
+| **Terminal native** | ✅ | ❌ | ❌ |
+| **Linux/Server friendly** | ✅ | ❌ | ❌ |
+| **Server management** | ✅ | ✅ | ✅ |
+
+**Perfect for:**
+- 🖥️ Server administrators
+- 🔧 DevOps engineers
+- 👨‍💻 Developers who live in the terminal
+- 🐧 Linux users
+
+---
+
+## 📄 Configuration
+
+<details>
+<summary>Click to expand full configuration reference</summary>
+
+```yaml
+ssh:
+  key: "id_rsa"              # SSH private key filename (default: id_rsa)
+  keep_alive: true           # Enable keep-alive (default: true)
+  keep_alive_interval: "60s" # Keep-alive interval (default: 60s)
+
+server:
+  - group: "prod"           # Group name (optional)
+    name: "web-master"       # Server name (required)
+    host: "192.168.1.10"     # Server host (required)
+    port: 22                 # SSH port (default: 22)
+    user: "root"             # SSH user (default: current user)
+    password: ""             # Password (optional, prefer SSH key)
+    desc: "Production web"   # Description (optional)
+```
+
+</details>
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+Made with ❤️ by [lymboy](https://github.com/lymboy)
+
+</div>
