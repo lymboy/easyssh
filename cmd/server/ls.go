@@ -8,14 +8,10 @@ import (
 
 var ServerLsCmd = &cobra.Command{
 	Use:          "ls",
-	Short:        "ls server list",
+	Short:        "List all servers",
 	Example:      "easyssh server ls",
 	SilenceUsage: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		print()
+		config.GetConf().Print()
 	},
-}
-
-func print() {
-	config.GetConf().Print()
 }
